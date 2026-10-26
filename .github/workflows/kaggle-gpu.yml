@@ -1,0 +1,155 @@
+# Runs the dmap_vae_kaggle notebooks on Kaggle with GPU T4 x2.
+#
+# 1. Uploads dmap_vae_kaggle/ as a new version of the Kaggle Dataset the notebooks
+#    look for under /kaggle/input.
+# 2. Pushes each selected notebook as a Kaggle kernel (GPU T4 x2, Internet on)
+#    attached to that dataset, waits for it, and stores its output as an artifact.
+#
+# Required repository secrets: KAGGLE_USERNAME plus either KAGGLE_API_TOKEN
+# (new tokens) or KAGGLE_KEY (legacy kaggle.json key).
+name: Kaggle GPU notebooks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dmap_vae_kaggle/**"
+      - ".github/workflows/kaggle-gpu.yml"
+  workflow_dispatch:
+    inputs:
+      notebooks:
+        description: "Comma-separated notebook names without .ipynb (e.g. 00_checks_kaggle,01_swiss_kaggle)"
+        default: "00_checks_kaggle"
+        required: true
+      action:
+        description: "run = upload code, push and wait; collect = only fetch status/output of the last run"
+        type: choice
+        options: [run, collect]
+        default: run
+
+concurrency:
+  group: kaggle-gpu
+  cancel-in-progress: false
+
+env:
+  KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+  KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+  KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+  KAGGLE_CLI: kaggle==2.2.4
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      notebooks: ${{ steps.list.outputs.notebooks }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        env:
+          REQUESTED: ${{ github.event.inputs.notebooks || '00_checks_kaggle' }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os, pathlib, sys
+          names = [n.strip().removesuffix(".ipynb") for n in os.environ["REQUESTED"].split(",") if n.strip()]
+          missing = [n for n in names if not pathlib.Path(f"dmap_vae_kaggle/{n}.ipynb").exists()]
+          if missing:
+              sys.exit(f"Unknown notebooks: {missing}")
+          print("notebooks=" + json.dumps(names))
+          EOF
+
+  upload:
+    needs: plan
+    if: github.event.inputs.action != 'collect'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install "$KAGGLE_CLI"
+      - name: Upload code as Kaggle Dataset version
+        run: |
+          ref="$KAGGLE_USERNAME/dndr-dmap-vae-kaggle"
+          pkg="$RUNNER_TEMP/pkg"
+          cp -r dmap_vae_kaggle "$pkg"
+          cat > "$pkg/dataset-metadata.json" <<EOF
+          {"title": "DNDR dmap_vae_kaggle", "id": "$ref", "licenses": [{"name": "other"}]}
+          EOF
+          if kaggle datasets status "$ref" >/dev/null 2>&1; then
+            kaggle datasets version -p "$pkg" --dir-mode zip -m "${GITHUB_SHA::12}"
+          else
+            kaggle datasets create -p "$pkg" --dir-mode zip
+          fi
+          # Kernels pushed before the version is processed would mount the old code.
+          for _ in $(seq 60); do
+            status=$(kaggle datasets status "$ref" 2>&1 || true)
+            echo "dataset: $status"
+            case "$status" in *ready*) exit 0;; *error*) exit 1;; esac
+            sleep 20
+          done
+          exit 1
+
+  notebook:
+    needs: [plan, upload]
+    if: always() && needs.plan.result == 'success' && (needs.upload.result == 'success' || needs.upload.result == 'skipped')
+    runs-on: ubuntu-latest
+    # GitHub-hosted jobs stop at 6 h; Kaggle keeps running. Use action=collect afterwards.
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      # ponytail: one GPU session at a time to stay under Kaggle's concurrent-session quota.
+      max-parallel: 1
+      matrix:
+        notebook: ${{ fromJson(needs.plan.outputs.notebooks) }}
+    env:
+      NOTEBOOK: ${{ matrix.notebook }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install "$KAGGLE_CLI"
+      - name: Kernel id
+        run: |
+          slug="dndr-$(echo "$NOTEBOOK" | tr '_' '-')"
+          echo "KERNEL=$KAGGLE_USERNAME/$slug" >> "$GITHUB_ENV"
+          echo "TITLE=$(echo "$slug" | tr '-' ' ')" >> "$GITHUB_ENV"
+      - name: Push notebook (GPU T4 x2)
+        if: github.event.inputs.action != 'collect'
+        run: |
+          dir="$RUNNER_TEMP/kernel"
+          mkdir -p "$dir"
+          cp "dmap_vae_kaggle/$NOTEBOOK.ipynb" "$dir/"
+          cat > "$dir/kernel-metadata.json" <<EOF
+          {
+            "id": "$KERNEL",
+            "title": "$TITLE",
+            "code_file": "$NOTEBOOK.ipynb",
+            "language": "python",
+            "kernel_type": "notebook",
+            "is_private": true,
+            "enable_gpu": true,
+            "machine_shape": "NvidiaTeslaT4",
+            "enable_internet": true,
+            "dataset_sources": ["$KAGGLE_USERNAME/dndr-dmap-vae-kaggle"]
+          }
+          EOF
+          kaggle kernels push -p "$dir" | tee push.log
+          # Poll this exact version so a stale "complete" from the previous run is never read.
+          version=$(grep -oP 'version \K[0-9]+' push.log | head -1)
+          echo "KERNEL_REF=$KERNEL${version:+/$version}" >> "$GITHUB_ENV"
+      - name: Wait for Kaggle run
+        run: |
+          sleep 60
+          while true; do
+            status=$(kaggle kernels status "${KERNEL_REF:-$KERNEL}" 2>&1 || true)
+            echo "$(date -u +%H:%M:%S) $status"
+            case "${status,,}" in
+              *complete*) exit 0;;
+              *error*|*cancel*) exit 1;;
+            esac
+            sleep 120
+          done
+      - name: Download output
+        if: always()
+        run: kaggle kernels output "$KERNEL" -p "out/$NOTEBOOK" -o || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.notebook }}
+          path: out/${{ matrix.notebook }}
+          if-no-files-found: warn

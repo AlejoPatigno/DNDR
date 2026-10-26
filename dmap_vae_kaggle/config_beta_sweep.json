@@ -1,0 +1,48 @@
+{
+  "dataset": "swiss",
+  "n": 3000,
+  "modes": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256
+  ],
+  "factors": [
+    4,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512
+  ],
+  "data_seeds": [
+    7,
+    1001,
+    1002,
+    1003,
+    1004,
+    1005
+  ],
+  "alpha": 1.0,
+  "backend": "flash",
+  "spectral_tolerance": 0.002,
+  "graph_k": 10,
+  "graph_ratio": 2.0,
+  "threshold": 0.001,
+  "out": "/kaggle/working/beta_sweep_swiss",
+  "selection": "graph"
+}

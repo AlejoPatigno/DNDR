@@ -1,0 +1,18 @@
+{
+  "kernel_dense_errors": [
+    3.685228542847266e-16,
+    3.406424505978827e-16,
+    5.36318596726082e-16
+  ],
+  "backend": "torch",
+  "device": "cpu",
+  "max_residual": 4.182251546066368e-09,
+  "perron_gap": 0.04898595902824432,
+  "min_eigenvalue": 0.6566715812069971,
+  "beta": 2.039790435109809,
+  "alpha": 1.0,
+  "flash_commit": "f5c2d1abb7e418829651f7e2fedbb8b323fd56f9",
+  "nystrom_training_relative_error": 2.597973573838153e-09,
+  "vae_freeze_and_shapes": "passed",
+  "dihedral_orientation": "passed"
+}

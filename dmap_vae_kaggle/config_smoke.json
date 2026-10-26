@@ -1,0 +1,30 @@
+{
+  "dataset": "swiss",
+  "n": 160,
+  "modes": [
+    2,
+    8
+  ],
+  "seeds": [
+    0,
+    1
+  ],
+  "epochs": 2,
+  "batch": 64,
+  "width_nn": 16,
+  "latent": 2,
+  "kl": 0.001,
+  "tau": 1.0,
+  "alpha": 1.0,
+  "beta_factor": 8,
+  "backend": "torch",
+  "protocol": "inductive",
+  "models": [
+    "ae",
+    "vae",
+    "direct",
+    "plainvae"
+  ],
+  "allow_cpu": true,
+  "out": "/tmp/dmap_smoke_swiss"
+}

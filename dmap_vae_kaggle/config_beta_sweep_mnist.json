@@ -1,0 +1,48 @@
+{
+  "dataset": "mnist",
+  "modes": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128
+  ],
+  "data": "/kaggle/working/mnist.npz",
+  "factors": [
+    0.1,
+    0.25,
+    0.5,
+    1,
+    1.5,
+    2,
+    3,
+    4,
+    6,
+    8,
+    12,
+    16
+  ],
+  "selection": "ambient",
+  "selection_modes": [
+    8,
+    16,
+    32
+  ],
+  "band": 1.05,
+  "out": "/kaggle/working/beta_sweep_mnist",
+  "n": 3000,
+  "data_seeds": [
+    7,
+    1001,
+    1002,
+    1003
+  ],
+  "alpha": 1.0,
+  "backend": "flash",
+  "spectral_tolerance": 0.002,
+  "graph_k": 10,
+  "graph_ratio": 2.0,
+  "threshold": 0.001
+}

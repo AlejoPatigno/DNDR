@@ -1,0 +1,35 @@
+{
+  "dataset": "alanine",
+  "n": 3000,
+  "modes": [
+    2,
+    8,
+    32
+  ],
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "epochs": 100,
+  "batch": 256,
+  "width_nn": 128,
+  "latent": 2,
+  "kl": 0.001,
+  "tau": 1.0,
+  "lr": 0.001,
+  "alpha": 0.5,
+  "beta": null,
+  "beta_factor": 8,
+  "backend": "flash",
+  "protocol": "inductive",
+  "models": [
+    "ae",
+    "vae",
+    "direct",
+    "plainvae",
+    "cvae"
+  ],
+  "out": "/kaggle/working/results_alanine",
+  "data": "/kaggle/input/alanine-prepared/alanine.npz"
+}

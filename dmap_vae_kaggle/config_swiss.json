@@ -1,0 +1,52 @@
+{
+  "dataset": "swiss",
+  "n": 3000,
+  "modes": [
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256
+  ],
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "resample_data": true,
+  "data_seed_base": 1000,
+  "epochs": 100,
+  "min_steps": 0,
+  "batch": 256,
+  "width_nn": 128,
+  "latent": 2,
+  "kl": 0.001,
+  "kl_warmup": 0,
+  "kl_warmup_staged": 20,
+  "tau": 1.0,
+  "lr": 0.001,
+  "alpha": 1.0,
+  "beta": null,
+  "beta_factor": "/kaggle/working/beta_sweep_swiss/beta_selection.json",
+  "backend": "flash",
+  "protocol": "inductive",
+  "models": [
+    "ae",
+    "vae",
+    "direct",
+    "plainvae",
+    "vae_from_ae"
+  ],
+  "m_protocols": [
+    "scratch",
+    "warm"
+  ],
+  "oracle_decoder": true,
+  "out": "/kaggle/working/results_swiss",
+  "restarts": 1,
+  "knn_k": 5,
+  "unfold_ratio": 10.0
+}

@@ -1,0 +1,10 @@
+{
+  "requested_repo": "https://github.com/sparsetrace/FlashDiffusionTests/tree/main",
+  "requested_repo_access": "404",
+  "used_repo": "https://github.com/sparsetrace/FlashDiffusion",
+  "commit": "f5c2d1abb7e418829651f7e2fedbb8b323fd56f9",
+  "source": "src/flashdiffusion/csrc/flash_diffusion_sm80.cu",
+  "sha256": "480e28cdcc7b10dfc6d6e441463d252401db8666dcbcac6ea163001774925a51",
+  "modifications_to_cuda_source": false,
+  "T4_build": "adaptation to SM75; requires on-device validation"
+}

@@ -1,0 +1,45 @@
+{
+  "dataset": "torus",
+  "modes": [
+    2,
+    3,
+    4,
+    8,
+    16,
+    32,
+    64
+  ],
+  "factors": [
+    2,
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256
+  ],
+  "selection": "degeneracy",
+  "degeneracy_pairs": 3,
+  "band": 2.0,
+  "sanity": 0.5,
+  "out": "/kaggle/working/beta_sweep_torus",
+  "n": 3000,
+  "data_seeds": [
+    7,
+    1001,
+    1002,
+    1003
+  ],
+  "alpha": 1.0,
+  "backend": "flash",
+  "spectral_tolerance": 0.002,
+  "graph_k": 10,
+  "graph_ratio": 2.0,
+  "threshold": 0.001
+}

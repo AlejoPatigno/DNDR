@@ -20,16 +20,81 @@ on:
       - "build_kaggle_package.py"
       - ".github/workflows/kaggle-gpu.yml"
   workflow_dispatch:
+    # One checkbox per notebook: input "nb_<name>" runs tests/ or experiments/<name>.ipynb.
     inputs:
-      notebooks:
-        description: "Comma-separated notebook names without .ipynb (e.g. 00_checks_kaggle,01_swiss_kaggle)"
-        default: "00_checks_kaggle"
-        required: true
       action:
         description: "run = upload code, push and wait; collect = only fetch status/output of the last run"
         type: choice
         options: [run, collect]
         default: run
+      nb_00_checks_kaggle:
+        description: "00 · Checks: kernel compile + numerical controls on both T4 (minutes)"
+        type: boolean
+        default: true
+      nb_01a_swiss_beta_sweep_kaggle:
+        description: "01a · Swiss roll: label-free beta sweep (10-55 min)"
+        type: boolean
+        default: false
+      nb_01_swiss_kaggle:
+        description: "01 · Swiss roll: full experiment with selected beta (15-25 min)"
+        type: boolean
+        default: false
+      nb_02_torus_kaggle:
+        description: "02 · Torus: basic run"
+        type: boolean
+        default: false
+      nb_02b_torus_protocolo_kaggle:
+        description: "02b · Torus: closing protocol T1-T5 (~5.5 h)"
+        type: boolean
+        default: false
+      nb_03_mnist_kaggle:
+        description: "03 · MNIST: basic run"
+        type: boolean
+        default: false
+      nb_03b_mnist_protocolo_kaggle:
+        description: "03b · MNIST: closing protocol M1-M4 (~3.5 h)"
+        type: boolean
+        default: false
+      nb_04_alanine_kaggle:
+        description: "04 · Alanine: basic run (needs alanine-prepared dataset)"
+        type: boolean
+        default: false
+      nb_04b_alanine_protocolo_kaggle:
+        description: "04b · Alanine: closing protocol L1-L5 (~4 h)"
+        type: boolean
+        default: false
+      nb_05_swiss_cierre_kaggle:
+        description: "05 · Swiss roll: closing experiments A, B, D (~7 h)"
+        type: boolean
+        default: false
+      nb_06_swiss_latente_kaggle:
+        description: "06 · Swiss roll: is the latent the rectangle? (~4.5 h)"
+        type: boolean
+        default: false
+      nb_07_swiss_lambda_kaggle:
+        description: "07 · Swiss roll: jac lambda sweep (3-4.5 h)"
+        type: boolean
+        default: false
+      nb_08_swiss_isometria_final_kaggle:
+        description: "08 · Swiss roll: final isometry (~3 h)"
+        type: boolean
+        default: false
+      nb_08_swiss_isometria_final_v2_kaggle:
+        description: "08 v2 · Swiss roll: isometry + no-DMAP control + grid (2-5 h)"
+        type: boolean
+        default: false
+      nb_09_exportar_figuras_kaggle:
+        description: "09 · Figure export (needs 08 v2 output in the same session)"
+        type: boolean
+        default: false
+      nb_11_swiss_oraculo_cuadricula_kaggle:
+        description: "11 · Swiss roll: AE + oracle and square grid (~6 h)"
+        type: boolean
+        default: false
+      nb_12_swiss_volumen_kaggle:
+        description: "12 · Swiss roll with volume, 3-D chart (~3.5 h)"
+        type: boolean
+        default: false
 
 concurrency:
   group: kaggle-gpu
@@ -50,11 +115,16 @@ jobs:
       - uses: actions/checkout@v4
       - id: list
         env:
-          REQUESTED: ${{ github.event.inputs.notebooks || '00_checks_kaggle' }}
+          # Empty on push: only the checks notebook runs.
+          INPUTS: ${{ toJSON(github.event.inputs) }}
         run: |
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
           import json, os, pathlib, sys
-          names = [n.strip().removesuffix(".ipynb") for n in os.environ["REQUESTED"].split(",") if n.strip()]
+          inputs = json.loads(os.environ["INPUTS"] or "null") or {"nb_00_checks_kaggle": "true"}
+          names = sorted(k.removeprefix("nb_") for k, v in inputs.items()
+                         if k.startswith("nb_") and str(v).lower() == "true")
+          if not names:
+              sys.exit("Select at least one notebook.")
           missing = [n for n in names if not any(pathlib.Path(d, f"{n}.ipynb").exists() for d in ("tests", "experiments"))]
           if missing:
               sys.exit(f"Unknown notebooks: {missing}")

@@ -111,7 +111,8 @@ El workflow [`.github/workflows/kaggle-gpu.yml`](../.github/workflows/kaggle-gpu
 - `push` a `main` que toque `src/`, `tests/`, `experiments/` o el script de empaquetado: corre solo
   `00_checks_kaggle`.
 - Manual (*Actions → Kaggle GPU notebooks → Run workflow*):
-  - `notebooks`: lista separada por comas, p. ej. `00_checks_kaggle,01a_swiss_beta_sweep_kaggle`.
+  - Una casilla por notebook (con su duración aproximada); se ejecutan los marcados, en orden
+    numérico. Por defecto solo está marcado `00_checks_kaggle`.
   - `action`: `run` (sube el código, ejecuta y espera) o `collect` (solo consulta el estado y descarga
     la salida de la última ejecución).
 

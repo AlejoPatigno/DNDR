@@ -1,7 +1,8 @@
 # Runs the dmap_vae_kaggle notebooks on Kaggle with GPU T4 x2.
 #
-# 1. Uploads dmap_vae_kaggle/ as a new version of the Kaggle Dataset the notebooks
-#    look for under /kaggle/input.
+# 1. Flattens src/, tests/ and experiments/configs/ with build_kaggle_package.py and
+#    uploads the result as a new version of the Kaggle Dataset the notebooks look for
+#    under /kaggle/input.
 # 2. Pushes each selected notebook as a Kaggle kernel (GPU T4 x2, Internet on)
 #    attached to that dataset, waits for it, and stores its output as an artifact.
 #
@@ -13,7 +14,10 @@ on:
   push:
     branches: [main]
     paths:
-      - "dmap_vae_kaggle/**"
+      - "src/**"
+      - "tests/**"
+      - "experiments/**"
+      - "build_kaggle_package.py"
       - ".github/workflows/kaggle-gpu.yml"
   workflow_dispatch:
     inputs:
@@ -51,7 +55,7 @@ jobs:
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
           import json, os, pathlib, sys
           names = [n.strip().removesuffix(".ipynb") for n in os.environ["REQUESTED"].split(",") if n.strip()]
-          missing = [n for n in names if not pathlib.Path(f"dmap_vae_kaggle/{n}.ipynb").exists()]
+          missing = [n for n in names if not any(pathlib.Path(d, f"{n}.ipynb").exists() for d in ("tests", "experiments"))]
           if missing:
               sys.exit(f"Unknown notebooks: {missing}")
           print("notebooks=" + json.dumps(names))
@@ -67,8 +71,7 @@ jobs:
       - name: Upload code as Kaggle Dataset version
         run: |
           ref="$KAGGLE_USERNAME/dndr-dmap-vae-kaggle"
-          pkg="$RUNNER_TEMP/pkg"
-          cp -r dmap_vae_kaggle "$pkg"
+          pkg=$(python3 build_kaggle_package.py "$RUNNER_TEMP")
           cat > "$pkg/dataset-metadata.json" <<EOF
           {"title": "DNDR dmap_vae_kaggle", "id": "$ref", "licenses": [{"name": "other"}]}
           EOF
@@ -113,7 +116,7 @@ jobs:
         run: |
           dir="$RUNNER_TEMP/kernel"
           mkdir -p "$dir"
-          cp "dmap_vae_kaggle/$NOTEBOOK.ipynb" "$dir/"
+          cp tests/"$NOTEBOOK.ipynb" "$dir/" 2>/dev/null || cp experiments/"$NOTEBOOK.ipynb" "$dir/"
           cat > "$dir/kernel-metadata.json" <<EOF
           {
             "id": "$KERNEL",

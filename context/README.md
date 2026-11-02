@@ -28,7 +28,9 @@ Lo que se contrasta:
 - **Controles sin DMAP** (`plainae`, `plainvae`), **orden de modos aleatorio** (`mode_order='shuffled'`)
   y **AE con oráculo** (`oracle_ae`, `oracle_ae_free`).
 - **Otras geometrías:** toro plano T² en R⁴ (obstrucción topológica de un latente euclídeo 2-D),
-  MNIST (sin carta conocida), dipéptido de alanina (diedros φ/ψ) y Swiss roll con volumen (3-D).
+  MNIST y E-MNIST (sin carta conocida), dipéptido de alanina (diedros φ/ψ) y Swiss roll con volumen (3-D).
+- **Espectro del operador:** cómo decaen los autovalores λ_k (k ≤ 1000) del DMAP congelado al variar β,
+  es decir, cuántos modos quedan por encima del ruido para cada ancho de kernel (E-MNIST).
 
 Ningún experimento demuestra por sí solo tasas minimax, isometría global ni novedad matemática;
 los criterios de éxito se fijan **antes** de correr cada protocolo.
@@ -52,6 +54,7 @@ Todo está en [`src/`](../src/), salvo `checks.py`, que está en [`tests/`](../t
 | `protocol.py` | Planes reanudables, réplicas, pruebas estadísticas (Fisher, Mann-Whitney, Wilcoxon, Clopper-Pearson) |
 | `geometry.py`, `volume.py`, `latent_figure.py` | Geometría exacta, alineamientos y análisis del latente |
 | `plots.py`, `export_figs.py` | CSV y figuras |
+| `spectrum.py` | Espectro λ_1…λ_d del operador DMAP para varios β (resolución densa, d = 1000) y su figura |
 | `checks.py` | Controles numéricos de implementación (kernel vs. referencia densa, ortogonalidad L²(π), Nyström…) |
 | `vendor/flash_diffusion.cu` | Copia sin cambios del kernel de [FlashDiffusion](https://github.com/sparsetrace/FlashDiffusion) (MIT), verificada por SHA-256 contra `SOURCE.json` |
 
@@ -85,6 +88,7 @@ Todo está en [`src/`](../src/), salvo `checks.py`, que está en [`tests/`](../t
 | `09_exportar_figuras_kaggle` | Figuras | Exporta `paper_figs.zip` (**requiere la salida de 08 v2**) | 5–10 min |
 | `11_swiss_oraculo_cuadricula_kaggle` | Experimento | AE + oráculo y cuadrícula separada 132×22 | ~6 h |
 | `12_swiss_volumen_kaggle` | Experimento | Swiss roll con volumen (dimensión intrínseca 3) | ~3.5 h |
+| `13_emnist_kaggle` | Experimento | E-MNIST `balanced`: espectro de autovalores para 8 valores de β (d = 1000) y experimento piloto como 03 (requiere el Dataset `crawford/emnist`) | por medir |
 
 Varios notebooks reutilizan resultados de otros desde `/kaggle/working` (p. ej. `beta_selection.json`
 de 01a). En casi todos es **opcional**: si no está, recalculan o usan β por defecto. Las excepciones

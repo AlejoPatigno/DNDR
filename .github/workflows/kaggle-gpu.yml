@@ -95,6 +95,10 @@ on:
         description: "12 · Swiss roll with volume, 3-D chart (~3.5 h)"
         type: boolean
         default: false
+      nb_13_emnist_kaggle:
+        description: "13 · E-MNIST: eigenvalue spectra for several beta (d=1000) + pilot experiment"
+        type: boolean
+        default: false
 
 concurrency:
   group: kaggle-gpu
@@ -187,6 +191,11 @@ jobs:
           dir="$RUNNER_TEMP/kernel"
           mkdir -p "$dir"
           cp tests/"$NOTEBOOK.ipynb" "$dir/" 2>/dev/null || cp experiments/"$NOTEBOOK.ipynb" "$dir/"
+          # Public Kaggle datasets a notebook reads besides the code package.
+          extra=""
+          case "$NOTEBOOK" in
+            13_emnist_kaggle) extra=', "crawford/emnist"';;
+          esac
           cat > "$dir/kernel-metadata.json" <<EOF
           {
             "id": "$KERNEL",
@@ -198,7 +207,7 @@ jobs:
             "enable_gpu": true,
             "machine_shape": "NvidiaTeslaT4",
             "enable_internet": true,
-            "dataset_sources": ["$KAGGLE_USERNAME/dndr-dmap-vae-kaggle"]
+            "dataset_sources": ["$KAGGLE_USERNAME/dndr-dmap-vae-kaggle"$extra]
           }
           EOF
           kaggle kernels push -p "$dir" | tee push.log

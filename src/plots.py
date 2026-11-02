@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from data import angles, output_angles
+from data import IMAGE_DATASETS, angles, output_angles
 
 
 def finish(fig, path):
@@ -328,7 +328,7 @@ def plot_results(folder):
             sample = np.load(root/f"seed_{sel['seed']}"/f"{stem(name, sel['m'], sel['restart'])}.npz")["prior_samples"]
             ramachandran([d2["truth"][d2["test"]], output_angles(sample, cfg["dataset"], meta)],
                          ["Reference", f"Prior samples ({name}, m={sel['m']})"], root/f"angles_generated_{name}")
-    elif cfg["dataset"] == "mnist":
+    elif cfg["dataset"] in IMAGE_DATASETS:
         first = root/f"seed_{chosen['seed']}"
         data = np.load(first/"data.npz")
         reference = data["x"][data["test"]]
@@ -340,7 +340,7 @@ def plot_results(folder):
                 ax.axis("off")
         fig.suptitle(f"Reference / D(mu) / E_q[D(z)] / prior samples  ({chosen['model']}, m={chosen['m']})")
         fig.tight_layout()
-        finish(fig, root/"mnist_ensembles")
+        finish(fig, root/f"{cfg['dataset']}_ensembles")
 
 
 if __name__ == "__main__":

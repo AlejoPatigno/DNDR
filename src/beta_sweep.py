@@ -21,7 +21,7 @@ import json
 import time
 from pathlib import Path
 import numpy as np
-from data import load_data
+from data import IMAGE_DATASETS, load_data
 from geometry import (graph_shortcut_mass, true_shortcut_mass, beta_flow, mode_diagnostics,
                       oracle_exact_swiss, affine_fit, chart_target, select_beta, base_beta,
                       degeneracy_defect, select_beta_argmin, knn_label_accuracy)
@@ -52,7 +52,7 @@ def run_job(cfg, data_seed, factors, device):
     swiss = cfg["dataset"] == "swiss"
     true_mass = true_shortcut_mass(u, truth[train], betas, fs) if swiss else [None]*len(betas)
     y = chart_target(cfg["dataset"], truth) if cfg["dataset"] in CHART_DATASETS else None
-    mnist = cfg["dataset"] == "mnist"
+    mnist = cfg["dataset"] in IMAGE_DATASETS
     rows = []
     for f, beta, gm, tm in zip(factors, betas, graph["graph_shortcut_mass"], true_mass):
         row = dict(data_seed=data_seed, factor=f, beta=beta, base_beta=b0,
@@ -182,7 +182,7 @@ def plot(df, parts, cfg, selection, out):
         ax2.axhline(exp, color="C3", lw=.8, ls=":")
         ax2.set_ylabel("height-mode position (dotted: intrinsic)")
         ax.legend(fontsize=8, loc="lower right")
-    elif cfg["dataset"] == "mnist" and len(ok):
+    elif cfg["dataset"] in IMAGE_DATASETS and len(ok):
         for m in cfg["modes"]:
             col = f"knn_label_acc_m{m}"
             if col in ok:

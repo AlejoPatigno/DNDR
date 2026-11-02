@@ -10,7 +10,7 @@ Qué se evalúa y por qué: [`context/README.md`](context/README.md).
 |---|---|
 | [`context/`](context/) | Contexto del proyecto (`README.md`), detalle técnico del paquete (`PACKAGE.md`) y estado de validación (`VALIDATION.md`) |
 | [`src/`](src/) | Código Python, `SOURCE.json` y `vendor/` (kernel CUDA de FlashDiffusion) |
-| [`experiments/`](experiments/) | Notebooks de experimentos (01–12) y sus configuraciones en `configs/` |
+| [`experiments/`](experiments/) | Notebooks de experimentos (01–13) y sus configuraciones en `configs/` |
 | [`tests/`](tests/) | Notebook de controles `00_checks_kaggle`, `checks.py`, configuración smoke y resultado de validación en CPU |
 | [`build_kaggle_package.py`](build_kaggle_package.py) | Junta `src/`, `tests/` y `experiments/configs/` en la carpeta plana que esperan los notebooks |
 | [`.github/workflows/kaggle-gpu.yml`](.github/workflows/kaggle-gpu.yml) | CI: sube el paquete a Kaggle y ejecuta los notebooks con GPU T4 x2 |

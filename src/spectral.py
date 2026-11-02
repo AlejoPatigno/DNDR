@@ -180,6 +180,24 @@ class SpectralMap:
         return model
 
 
+def dmap_spectrum(x, d, beta, alpha=1., backend="torch", device="cpu", tile=512):
+    """Leading d+1 eigenvalues (Perron value 1 first, descending) of the operator SpectralMap.fit
+    solves: S = D^-1/2 K_alpha D^-1/2 on centred x, diagonal retained, same Gaussian backend.
+    Built densely and solved with LAPACK, so any d < N is exact; ARPACK at d ~ 1000 is slow and may
+    not converge.  Memory: a few N x N float64 matrices, so keep N <= ~10^4."""
+    from scipy.linalg import eigvalsh
+    x = np.asarray(x, dtype=np.float64)
+    n = len(x)
+    if not 0 < d < n:
+        raise ValueError("Need 0 < d < N.")
+    kernel = Gaussian(x - x.mean(0), float(beta), backend, device, tile)
+    k = kernel.apply(np.eye(n))
+    k = (k + k.T) / 2                       # fp16/fp32 kernel tiles are symmetric only to rounding
+    w = k.sum(1)**(-alpha)
+    scale = w / np.sqrt(w * (k @ w))
+    return eigvalsh(scale[:, None] * k * scale[None, :], subset_by_index=[n-d-1, n-1])[::-1]
+
+
 def backend_check(backend="torch", device="cpu"):
     """Non-multiple tile sizes and feature widths; compare the ACTUAL quantized operator."""
     errors = []

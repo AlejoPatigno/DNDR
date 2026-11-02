@@ -1,0 +1,21 @@
+{
+  "dataset": "emnist",
+  "split": "balanced",
+  "data": "/kaggle/working/emnist_balanced.npz",
+  "n": 6000,
+  "data_seed": 7,
+  "d": 1000,
+  "factors": [
+    0.1,
+    0.25,
+    0.5,
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "alpha": 1.0,
+  "backend": "flash",
+  "out": "/kaggle/working/spectrum_emnist"
+}

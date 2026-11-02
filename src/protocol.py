@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from data import IMAGE_DATASETS
 
 HERE = Path(__file__).resolve().parent
 COMMON = dict(epochs=2500, batch=512, min_steps=10_000, tau=1.0, kl=1e-3, resample_data=True,
@@ -31,7 +32,7 @@ def models_per_seed(p, common=COMMON):
         + sum(k in kinds for k in ("plainvae", "plainae"))
     if "warm" in p.get("m_protocols", ["scratch"]):
         n += (len(p["modes"]) - 1) * len([k for k in kinds if k in ("ae", "vae", "direct")])
-    if p.get("dataset", "swiss") != "mnist" and p.get("oracle_decoder", True):
+    if p.get("dataset", "swiss") not in IMAGE_DATASETS and p.get("oracle_decoder", True):
         n += p.get("chart_decoder_epochs", common["epochs"]) / common["epochs"]
     return n * common.get("restarts", 1)
 

@@ -5,11 +5,11 @@ import tempfile
 from pathlib import Path
 import numpy as np
 import torch
-from data import swiss, partitions, circular, angles, dihedral
+from data import swiss, partitions, circular, angles, dihedral, ensure_emnist
 from geometry import (swiss_embed, oracle_exact_swiss, chart_alignment, graph_shortcut_mass,
                       select_beta, base_beta, knn_chart_mse, knn_chart_floor,
                       degeneracy_defect, select_beta_argmin, knn_label_accuracy, local_distortion)
-from spectral import SpectralMap, choose_beta, backend_check
+from spectral import SpectralMap, choose_beta, backend_check, dmap_spectrum
 from vae import (fit_model, predict, predict_mc, posterior_stats, expand_state, build, VAE)
 
 
@@ -59,6 +59,37 @@ def sign_checks(backend, device):
     overlap = np.sum(a.psi[:, :4]*b.psi[:, :4]*a.pi[:, None], 0)   # L2(pi) inner products
     assert np.all(overlap > 0.999), overlap
     return {"eigenvector_sign_convention": "passed", "sign_overlap_min": float(overlap.min())}
+
+
+def spectrum_checks(backend, device):
+    """The dense spectrum (used for d ~ 1000) is the SAME operator SpectralMap.fit solves with ARPACK."""
+    x, _ = swiss(400)
+    u = (x-x.mean(0))/x.std()
+    beta = choose_beta(u)*16
+    dense = dmap_spectrum(u, 12, beta, backend=backend, device=device)
+    arpack = SpectralMap(12, beta, backend=backend, device=device).fit(u)
+    assert dense.shape == (13,) and abs(dense[0]-1) < 1e-5, dense[:3]
+    assert np.all(np.diff(dense) <= 1e-12), "eigenvalues must be sorted descending"
+    error = float(np.max(np.abs(dense[1:]-arpack.values)))
+    assert error < 1e-4, error
+    return {"dense_spectrum_vs_arpack": "passed", "dense_spectrum_max_abs_error": error}
+
+
+def emnist_checks():
+    """crawford/emnist CSVs store each 28x28 image TRANSPOSED; the cache must hold upright images."""
+    rng = np.random.default_rng(3)
+    upright = rng.integers(0, 256, (6, 28, 28), dtype=np.uint8)
+    labels = np.arange(6, dtype=np.uint8)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        rows = np.column_stack([labels, upright.transpose(0, 2, 1).reshape(6, -1)])
+        for part in ("train", "test"):
+            np.savetxt(tmp/f"emnist-balanced-{part}.csv", rows, fmt="%d", delimiter=",")
+        with np.load(ensure_emnist(tmp/"cache"/"emnist.npz", "balanced", search=tmp)) as a:
+            for part in ("train", "test"):
+                np.testing.assert_array_equal(a[f"x_{part}"], upright)
+                np.testing.assert_array_equal(a[f"y_{part}"], labels)
+    return {"emnist_csv_orientation": "passed"}
 
 
 def protocol_checks():
@@ -190,6 +221,8 @@ def check(backend="torch", device="cpu"):
     result.update(reg_checks(device))
     result.update(knn_checks())
     result.update(sign_checks(backend, device))
+    result.update(spectrum_checks(backend, device))
+    result.update(emnist_checks())
     result.update(continuation_checks(device))
     result.update(oracle_head_checks(device))
     x, truth = swiss(160)

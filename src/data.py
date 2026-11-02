@@ -71,6 +71,38 @@ def ensure_mnist(path):
     return path
 
 
+IMAGE_DATASETS = ("mnist", "emnist")   # 28x28 labelled images: no chart, label probe only
+
+
+def ensure_emnist(path, split="balanced", search="/kaggle/input"):
+    """EMNIST from the Kaggle dataset crawford/emnist (emnist-<split>-{train,test}.csv: label, then the
+    784 pixels of the image stored TRANSPOSED), cached as an MNIST-style npz with upright images so the
+    MNIST branch reads it unchanged.  Written atomically, as ensure_mnist."""
+    import os
+    import pandas as pd
+    path = Path(path)
+    if valid_mnist(path):
+        return path
+    arrays = {}
+    for part in ("train", "test"):
+        hits = sorted(Path(search).rglob(f"emnist-{split}-{part}.csv"))
+        if not hits:
+            raise FileNotFoundError(f"emnist-{split}-{part}.csv not found under {search}: "
+                                    "attach the Kaggle dataset crawford/emnist.")
+        a = pd.read_csv(hits[0], header=None).to_numpy(np.uint8)
+        arrays[f"x_{part}"] = a[:, 1:].reshape(-1, 28, 28).transpose(0, 2, 1)
+        arrays[f"y_{part}"] = a[:, 0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.part.npz")
+    try:
+        np.savez(tmp, **arrays)
+        os.replace(tmp, path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    return path
+
+
 def grid_chart(n, width=60., height=10.):
     """Perfect rectangular grid with ~n nodes and (almost) equal spacing in s and h:
     ny = round(sqrt(n*H/W)), nx = round(n/ny); nodes at cell centres, so no point sits on the border."""
@@ -145,8 +177,12 @@ def load_data(cfg):
         z = np.random.default_rng(data_seed).uniform(-np.pi, np.pi, (n, 2))
         x = circular(z)*[1, 1, .6, .6]  # FLAT product torus T2 in R4.
         f, split = x.copy(), partitions(n, split_seed)
-    elif kind == "mnist":
-        path = ensure_mnist(cfg.get("data", "mnist.npz"))
+    elif kind in IMAGE_DATASETS:
+        if kind == "mnist":
+            path = ensure_mnist(cfg.get("data", "mnist.npz"))
+        else:
+            meta["split"] = cfg.get("split", "balanced")
+            path = ensure_emnist(cfg.get("data", "emnist.npz"), meta["split"], cfg.get("search", "/kaggle/input"))
         a = np.load(path, allow_pickle=False)
         # The subsample follows data_seed (default 7 = earlier runs), so resample_data gives
         # independent replicates (different training images) and not only new initializations.

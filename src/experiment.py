@@ -28,7 +28,7 @@ from pathlib import Path
 import time
 import numpy as np
 import torch
-from data import load_data, circular, angles, molecular_metrics, angle_metrics, output_angles
+from data import IMAGE_DATASETS, load_data, circular, angles, molecular_metrics, angle_metrics, output_angles
 from geometry import (affine_fit, chart_target, chart_alignment, oracle_exact_swiss, torus_embed,
                       SwissSurface, base_beta, knn_chart_mse, knn_chart_floor, knn_label_accuracy,
                       affine_ambient, local_distortion)
@@ -220,7 +220,7 @@ def run(cfg):
         ax_pred = affine_ambient(f.astype(np.float64), target.astype(np.float64), train, cfg.get("ridge", 1e-6))*xs+xm
         row = dict(seed=seed, model="affine_x", m=m, mse_x=ambient(ax_pred[test], test),
                    affine_validation_mse_x=ambient(ax_pred[val], val))
-        if dataset == "mnist":
+        if dataset in IMAGE_DATASETS:
             row["knn_label_accuracy"] = knn_label_accuracy(f[train], truth[train], f[test], truth[test], knn_k)
         metrics.append(row)
         for name in names:
@@ -289,7 +289,7 @@ def run(cfg):
                                unfolded=bool(knn <= unfold_ratio*knn_floor))
                     if swiss:
                         row.update(chart_alignment(train_code, truth[train], code, truth[test]))
-                if dataset == "mnist" and kind != "direct":
+                if dataset in IMAGE_DATASETS and kind != "direct":
                     _, train_code = predict(model, fi[train], device, sub(train))
                     packet["code_train"] = train_code
                     row["knn_label_accuracy"] = knn_label_accuracy(train_code, truth[train], code, truth[test], knn_k)

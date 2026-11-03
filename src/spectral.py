@@ -198,6 +198,42 @@ def dmap_spectrum(x, d, beta, alpha=1., backend="torch", device="cpu", tile=512)
     return eigvalsh(scale[:, None] * k * scale[None, :], subset_by_index=[n-d-1, n-1])[::-1]
 
 
+def krylov_spectrum(x, k, beta, alpha=1., backend="torch", device="cpu", block=None, steps=6, tile=4096, seed=7):
+    """Leading k+1 eigenvalues (Perron first, descending) and Ritz residuals of the SAME operator as
+    dmap_spectrum, without ever forming N x N: randomized block Krylov (block Lanczos, full
+    reorthogonalization) plus Rayleigh-Ritz.  Memory: two N x block*steps float64 bases.  Cost: torch
+    does one tiled kernel pass per block (`steps` passes); flash only exposes single-vector products,
+    so it costs one upstream WMMA pass per Krylov vector (m = block*steps passes), as in SpectralMap."""
+    x = np.asarray(x, dtype=np.float64)
+    n = len(x)
+    block = block or k + 1 + max(10, (k+1)//10)
+    m = block*steps
+    if not 0 < k or m >= n:
+        raise ValueError("Need 0 < k and block*steps < N.")
+    kernel = Gaussian(x - x.mean(0), float(beta), backend, device, tile)
+    w = kernel.apply(np.ones(n)).ravel()**(-alpha)
+    scale = w / np.sqrt(w * kernel.apply(w).ravel())
+    if backend == "flash":
+        op = lambda v: np.column_stack([kernel.symmetric(c, scale) for c in v.T])
+    else:
+        op = lambda v: scale[:, None] * kernel.apply(scale[:, None] * v)
+    v, sv = np.empty((n, m)), np.empty((n, m))
+    v[:, :block] = np.linalg.qr(np.random.default_rng(seed).normal(size=(n, block)))[0]
+    for j in range(steps):
+        cols = slice(j*block, (j+1)*block)
+        sv[:, cols] = op(v[:, cols])
+        if j == steps-1:
+            break
+        w_ = sv[:, cols].copy()
+        for _ in range(2):                  # classical block Gram-Schmidt, twice
+            w_ -= v[:, :cols.stop] @ (v[:, :cols.stop].T @ w_)
+        v[:, cols.stop:cols.stop+block] = np.linalg.qr(w_)[0]
+    h = v.T @ sv
+    theta, u = np.linalg.eigh((h + h.T) / 2)
+    theta, u = theta[::-1][:k+1], u[:, ::-1][:, :k+1]
+    return theta, np.linalg.norm(sv @ u - (v @ u)*theta, axis=0)
+
+
 def backend_check(backend="torch", device="cpu"):
     """Non-multiple tile sizes and feature widths; compare the ACTUAL quantized operator."""
     errors = []

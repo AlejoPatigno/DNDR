@@ -31,6 +31,13 @@ Lo que se contrasta:
   MNIST y E-MNIST (sin carta conocida), dipéptido de alanina (diedros φ/ψ) y Swiss roll con volumen (3-D).
 - **Espectro del operador:** cómo decaen los autovalores λ_k (k ≤ 1000) del DMAP congelado al variar β,
   es decir, cuántos modos quedan por encima del ruido para cada ancho de kernel (E-MNIST).
+  Con las 112 800 imágenes de entrenamiento de E-MNIST la matriz densa (102 GB) no cabe, así que se usa Krylov
+  por bloques sin formar la matriz (reortogonalización completa + Rayleigh–Ritz, con residuos). Este espectro
+  usa el kernel por bloques de PyTorch (fp32 en GPU): FlashDiffusion solo aplica un vector por pasada y, a
+  N completo, costaría horas por β. El encoder y los experimentos siguen usando FlashDiffusion.
+- **Dimensión de Weyl:** λ_i = −ln μ_i ~ i^(2/d) (el tiempo de difusión solo desplaza la ordenada), de modo que
+  d = 2 / pendiente de ln λ_i contra ln i en la ventana i ∈ [10, 300]. Los β muy grandes (kernel más estrecho
+  que el espaciado entre vecinos) quedan fuera del régimen de Weyl y su d no es una dimensión intrínseca.
 
 Ningún experimento demuestra por sí solo tasas minimax, isometría global ni novedad matemática;
 los criterios de éxito se fijan **antes** de correr cada protocolo.
@@ -54,7 +61,7 @@ Todo está en [`src/`](../src/), salvo `checks.py`, que está en [`tests/`](../t
 | `protocol.py` | Planes reanudables, réplicas, pruebas estadísticas (Fisher, Mann-Whitney, Wilcoxon, Clopper-Pearson) |
 | `geometry.py`, `volume.py`, `latent_figure.py` | Geometría exacta, alineamientos y análisis del latente |
 | `plots.py`, `export_figs.py` | CSV y figuras |
-| `spectrum.py` | Espectro λ_1…λ_d del operador DMAP para varios β (resolución densa, d = 1000) y su figura |
+| `spectrum.py` | Espectro λ_1…λ_k del operador DMAP para varios β (denso o Krylov sin matriz, k = 1000), dimensión de Weyl y su figura |
 | `checks.py` | Controles numéricos de implementación (kernel vs. referencia densa, ortogonalidad L²(π), Nyström…) |
 | `vendor/flash_diffusion.cu` | Copia sin cambios del kernel de [FlashDiffusion](https://github.com/sparsetrace/FlashDiffusion) (MIT), verificada por SHA-256 contra `SOURCE.json` |
 
@@ -88,7 +95,7 @@ Todo está en [`src/`](../src/), salvo `checks.py`, que está en [`tests/`](../t
 | `09_exportar_figuras_kaggle` | Figuras | Exporta `paper_figs.zip` (**requiere la salida de 08 v2**) | 5–10 min |
 | `11_swiss_oraculo_cuadricula_kaggle` | Experimento | AE + oráculo y cuadrícula separada 132×22 | ~6 h |
 | `12_swiss_volumen_kaggle` | Experimento | Swiss roll con volumen (dimensión intrínseca 3) | ~3.5 h |
-| `13_emnist_kaggle` | Experimento | E-MNIST `balanced`: espectro de autovalores para 8 valores de β (d = 1000) y experimento piloto como 03 (requiere el Dataset `crawford/emnist`) | por medir |
+| `13_emnist_kaggle` | Experimento | E-MNIST `balanced`: espectro de autovalores para 8 valores de β (k = 1000, todo el entrenamiento, Krylov) con dimensión de Weyl, y experimento piloto como 03 (requiere el Dataset `crawford/emnist`) | por medir |
 
 Varios notebooks reutilizan resultados de otros desde `/kaggle/working` (p. ej. `beta_selection.json`
 de 01a). En casi todos es **opcional**: si no está, recalculan o usan β por defecto. Las excepciones

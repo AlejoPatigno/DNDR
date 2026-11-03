@@ -9,7 +9,8 @@ from data import swiss, partitions, circular, angles, dihedral, ensure_emnist
 from geometry import (swiss_embed, oracle_exact_swiss, chart_alignment, graph_shortcut_mass,
                       select_beta, base_beta, knn_chart_mse, knn_chart_floor,
                       degeneracy_defect, select_beta_argmin, knn_label_accuracy, local_distortion)
-from spectral import SpectralMap, choose_beta, backend_check, dmap_spectrum
+from spectral import SpectralMap, choose_beta, backend_check, dmap_spectrum, krylov_spectrum
+from spectrum import weyl_dimension
 from vae import (fit_model, predict, predict_mc, posterior_stats, expand_state, build, VAE)
 
 
@@ -73,6 +74,32 @@ def spectrum_checks(backend, device):
     error = float(np.max(np.abs(dense[1:]-arpack.values)))
     assert error < 1e-4, error
     return {"dense_spectrum_vs_arpack": "passed", "dense_spectrum_max_abs_error": error}
+
+
+def krylov_checks(backend, device):
+    """Matrix-free block Krylov reproduces the dense spectrum of the same operator and backend."""
+    x, _ = swiss(400)
+    u = (x-x.mean(0))/x.std()
+    beta = choose_beta(u)*16
+    dense = dmap_spectrum(u, 12, beta, backend=backend, device=device)
+    vals, res = krylov_spectrum(u, 12, beta, backend=backend, device=device, block=20, steps=10)
+    error = float(np.max(np.abs(vals-dense)))
+    tol, rtol = (1e-8, 1e-6) if backend == "torch" else (1e-4, 1e-3)   # flash: fp16 coordinates
+    assert error < tol and res.max() < rtol, (error, res.max())
+    return {"krylov_vs_dense": "passed", "krylov_max_abs_error": error, "krylov_max_residual": float(res.max())}
+
+
+def weyl_checks():
+    """Weyl's law on analytic flat tori: lambda ~ i^(2/d) must give d = 2 and d = 3."""
+    out = {}
+    for dim, r, tol in ((2, 60, .15), (3, 15, .3)):
+        n = np.arange(-r, r+1)
+        lam = np.sort(sum(g.ravel()**2 for g in np.meshgrid(*[n]*dim)))[:1001].astype(float)
+        d, _ = weyl_dimension(np.exp(-1e-3*lam), (10, 1000))
+        assert abs(d-dim) < tol, (dim, d)
+        out[f"weyl_d_torus{dim}"] = float(d)
+    assert np.isnan(weyl_dimension(np.exp(-1e-3*lam[:8]), (10, 1000))[0])
+    return out
 
 
 def emnist_checks():
@@ -222,6 +249,8 @@ def check(backend="torch", device="cpu"):
     result.update(knn_checks())
     result.update(sign_checks(backend, device))
     result.update(spectrum_checks(backend, device))
+    result.update(krylov_checks(backend, device))
+    result.update(weyl_checks())
     result.update(emnist_checks())
     result.update(continuation_checks(device))
     result.update(oracle_head_checks(device))

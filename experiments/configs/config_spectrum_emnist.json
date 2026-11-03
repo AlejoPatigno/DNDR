@@ -2,9 +2,18 @@
   "dataset": "emnist",
   "split": "balanced",
   "data": "/kaggle/working/emnist_balanced.npz",
-  "n": 6000,
+  "n": 112800,
   "data_seed": 7,
-  "d": 1000,
+  "all_train": true,
+  "method": "krylov",
+  "k": 1000,
+  "steps": 6,
+  "tile": 4096,
+  "tol": 0.0001,
+  "weyl_window": [
+    10,
+    300
+  ],
   "factors": [
     0.1,
     0.25,
@@ -16,6 +25,6 @@
     16
   ],
   "alpha": 1.0,
-  "backend": "flash",
+  "backend": "torch",
   "out": "/kaggle/working/spectrum_emnist"
 }

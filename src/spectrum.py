@@ -107,8 +107,12 @@ MARKERS = "osv^Dp<>h*"
 def _style(ax):
     ax.set(xscale="log", yscale="log")
     ax.tick_params(which="both", direction="in", top=True, right=True)
-    ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0e}"))
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0e}"))
+    fmt = matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0e}")
+    for axis in (ax.xaxis, ax.yaxis):
+        axis.set_major_formatter(fmt)
+        # matplotlib labels minor ticks itself (as 4x10^-2) when the range is under ~1 decade.
+        axis.set_minor_formatter(fmt if np.ptp(np.log10(axis.get_view_interval())) < 1
+                                 else matplotlib.ticker.NullFormatter())
 
 
 def _save(fig, stem):

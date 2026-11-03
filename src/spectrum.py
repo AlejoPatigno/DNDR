@@ -4,9 +4,8 @@
 
 Same data, anchors (training split) and input standardization as experiment.py, and
 beta = factor * base_beta as resolve_beta does, so each curve is the spectrum the encoder of a run
-with that beta_factor would truncate.  Writes spectrum.npz and spectrum.png/.pdf to cfg['out']:
-(a) lambda_k against k, one curve per beta; (b) the same values as a beta x k "spectrogram"; (c) the
-local Weyl dimension d(i).  Weyl's law lambda_i ~ i^(2/d) with lambda_i = -ln mu_i (diffusion time only
+with that beta_factor would truncate.  Writes spectrum.npz and three separate figures (.png/.pdf) to
+cfg['out'], see figures().  Weyl's law lambda_i ~ i^(2/d) with lambda_i = -ln mu_i (diffusion time only
 shifts the intercept) gives d = 2 / slope of ln lambda_i against ln i over cfg['weyl_window'].
 method "dense" is exact (N <~ 10^4); "krylov" is matrix-free, so all_train runs on every training image.
 """
@@ -17,6 +16,7 @@ import time
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import numpy as np
 import torch
 from data import load_data
@@ -27,16 +27,16 @@ FLOOR = 1e-16   # plotting floor only: rounding can leave the far tail at or bel
 
 
 def weyl_dimension(mu, window=(10, 300), valid=None):
-    """(d, slope) from the log-log fit of lambda_i = -ln mu_i over indices in window; mu[0] is the Perron value.
-    Only 0 < mu_i < 1 (and valid, if given) count; NaN with fewer than 5 points."""
+    """(d, slope, intercept) from the log-log fit ln(-ln mu_i) = slope ln i + intercept over indices in
+    window; mu[0] is the Perron value.  Only 0 < mu_i < 1 (and valid, if given) count; NaN with < 5 points."""
     i = np.arange(len(mu))
     use = (i >= window[0]) & (i <= window[1]) & (mu > 0) & (mu < 1)
     if valid is not None:
         use &= valid
     if use.sum() < 5:
-        return np.nan, np.nan
-    slope = np.polyfit(np.log(i[use]), np.log(-np.log(mu[use])), 1)[0]
-    return 2/slope, slope
+        return np.nan, np.nan, np.nan
+    slope, intercept = np.polyfit(np.log(i[use]), np.log(-np.log(mu[use])), 1)
+    return 2/slope, slope, intercept
 
 
 def local_dimension(mu, valid=None):
@@ -64,8 +64,9 @@ def run(cfg):
         probe.apply(np.random.default_rng(0).normal(size=len(u)))
         one = time.perf_counter()-started
         m = (cfg.get("block") or k + 1 + max(10, (k+1)//10)) * cfg.get("steps", 6)
+        # Lower bound only: each beta also pays the block products and the N x m reorthogonalization on CPU.
         passes = m if backend == "flash" else cfg.get("steps", 6)
-        print(f"one kernel pass: {one:.2f} s, projected {one*passes/60:.1f} min per beta (m={m}, {backend})", flush=True)
+        print(f"one kernel pass: {one:.2f} s, >= {one*passes/60:.1f} min per beta (m={m}, {backend})", flush=True)
     for f in factors:
         started = time.perf_counter()
         if method == "krylov":
@@ -87,37 +88,87 @@ def run(cfg):
     table = [dict(factor=f, beta=f*b0, weyl_d=dm, max_window_residual=r) for f, dm, r in zip(factors, dims, window_res)]
     (out/"spectrum_meta.json").write_text(json.dumps({"config": cfg, "data": meta, "n_anchors": len(u),
                                                       "method": method, "backend": backend, "weyl": table}, indent=2, default=str))
-    figure(values, valid, dims, window, factors, b0, len(u), cfg, out/"spectrum")
+    figures(out, cfg)
     return values
 
 
-def figure(values, valid, dims, window, factors, b0, n, cfg, stem):
-    k = np.arange(1, values.shape[1])
-    lam = np.clip(values[:, 1:], FLOOR, None)          # drop the Perron value lambda_0 = 1
-    colors = plt.cm.viridis(np.linspace(0, 1, len(factors)))
-    fig, (ax, bx, cx) = plt.subplots(1, 3, figsize=(17, 4.4), gridspec_kw={"width_ratios": [1, 1.15, 1]})
-    for row, f, c, dm in zip(lam, factors, colors, dims):
-        ax.plot(k, row, color=c, lw=1.2, label=f"factor {f:g}, d={dm:.1f}")
-    ax.set(xscale="log", yscale="log", xlabel="mode k", ylabel=r"$\lambda_k$",
-           title=f"(a) DMAP spectrum, k={len(k)}")
-    ax.legend(fontsize=7, loc="lower left")
-    im = bx.imshow(np.log10(lam), aspect="auto", origin="lower", cmap="magma", interpolation="nearest",
-                   extent=[.5, len(k)+.5, -.5, len(factors)-.5])
-    bx.set_yticks(range(len(factors)), [f"{f:g}" for f in factors])
-    bx.set(xlabel="mode k", ylabel="beta factor (x base beta)", title=r"(b) $\log_{10}\lambda_k$ by beta")
-    fig.colorbar(im, ax=bx, label=r"$\log_{10}\lambda_k$")
-    for mu, ok, f, c in zip(values, valid, factors, colors):
-        cx.plot(*local_dimension(mu, ok), color=c, lw=1.2, label=f"{f:g}")
-    cx.axvspan(*window, color="0.8", alpha=.5, lw=0)
-    cx.set(xscale="log", ylim=(0, 40), xlabel="mode i", ylabel="local d(i)",
-           title=r"(c) $d=2/$slope of $\ln\lambda$ vs $\ln i$ on $[i,2i]$")
-    fig.suptitle(f"{cfg['dataset']}{'/'+cfg['split'] if cfg.get('split') else ''}: N={n} anchors, "
-                 f"alpha={cfg.get('alpha', 1.)}, base beta={b0:.3g} (median heuristic)", fontsize=10)
+MARKERS = "osv^Dp<>h*"
+
+
+def _style(ax):
+    ax.set(xscale="log", yscale="log")
+    ax.tick_params(which="both", direction="in", top=True, right=True)
+    ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0e}"))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:.0e}"))
+
+
+def _save(fig, stem):
     fig.tight_layout()
     for ext in ("png", "pdf"):
-        fig.savefig(f"{stem}.{ext}", dpi=160)
+        fig.savefig(f"{stem}.{ext}", dpi=200)
     plt.close(fig)
 
 
+def figures(out, cfg=None):
+    """Separate figures from out/spectrum.npz (also: python spectrum.py --plot <out>):
+    spectrum_weyl:    lambda_n = -4 beta ln mu_n against n/N, log-log, one curve per beta, dashed effective
+                      Weyl scaling (n/N)^(2/d) fitted on the window.  The Gaussian kernel exp(-beta r^2)
+                      with alpha = 1 approximates the heat semigroup at t = 1/(4 beta), so this rescaling
+                      makes curves of different beta collapse where the Weyl regime holds.
+    spectrum_heatmap: log10 mu_k over beta x k.
+    spectrum_local_d: local Weyl dimension on windows [i, 2i]."""
+    out = Path(out)
+    a = np.load(out/"spectrum.npz")
+    cfg = cfg or json.loads((out/"spectrum_meta.json").read_text())["config"]
+    values, factors, betas = a["eigenvalues"], a["factors"], a["betas"]
+    n = int(a["n_anchors"])
+    res = a["residuals"] if "residuals" in a.files else np.zeros_like(values)
+    valid = res < cfg.get("tol", 1e-4)
+    window = tuple(cfg.get("weyl_window", (10, 300)))
+    colors = plt.cm.viridis(np.linspace(0, .9, len(factors)))
+    title = f"{cfg['dataset']}{'/'+cfg['split'] if cfg.get('split') else ''}, N = {n}"
+
+    fig, ax = plt.subplots(figsize=(6.4, 5))
+    for j, (mu, ok, f, b, c) in enumerate(zip(values, valid, factors, betas, colors)):
+        i = np.arange(len(mu))
+        use = (i > 0) & ok & (mu > 0) & (mu < 1)
+        lam = -4*b*np.log(mu[use])
+        x = i[use]/n
+        if len(x) < 2:                                  # no converged mode: nothing to draw
+            continue
+        d, slope, cut = weyl_dimension(mu, window, ok)
+        ax.plot(x, lam, color=c, lw=.8, marker=MARKERS[j % len(MARKERS)], ms=4, mfc="none",
+                markevery=np.unique(np.geomspace(1, len(x), 30).astype(int)-1),
+                label=f"factor {f:g} ($\\beta$={b:.2g}), d = {d:.1f}")
+        if np.isfinite(d):
+            ax.plot(x, 4*b*np.exp(cut)*(x*n)**slope, color=c, lw=.9, ls="--")
+    _style(ax)
+    ax.set(xlabel="n / N", ylabel=r"$\lambda_n = -4\beta\,\ln\mu_n$", title=title)
+    ax.legend(fontsize=7, frameon=True, edgecolor="k", fancybox=False, loc="lower right")
+    _save(fig, out/"spectrum_weyl")
+
+    fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    im = ax.imshow(np.log10(np.clip(values[:, 1:], FLOOR, None)), aspect="auto", origin="lower",
+                   cmap="magma", interpolation="nearest",
+                   extent=[.5, values.shape[1]-.5, -.5, len(factors)-.5])
+    ax.set_yticks(range(len(factors)), [f"{f:g}" for f in factors])
+    ax.set(xlabel="mode k", ylabel=r"$\beta$ factor ($\times$ base $\beta$)", title=title)
+    fig.colorbar(im, ax=ax, label=r"$\log_{10}\mu_k$")
+    _save(fig, out/"spectrum_heatmap")
+
+    fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    for j, (mu, ok, f, c) in enumerate(zip(values, valid, factors, colors)):
+        ax.plot(*local_dimension(mu, ok), color=c, lw=.8, marker=MARKERS[j % len(MARKERS)], ms=4,
+                mfc="none", label=f"factor {f:g}")
+    ax.axvspan(*window, color="0.85", lw=0)
+    ax.set(xscale="log", ylim=(0, 40), xlabel="mode i", ylabel="local Weyl d(i) on [i, 2i]", title=title)
+    ax.tick_params(which="both", direction="in", top=True, right=True)
+    ax.legend(fontsize=7, frameon=True, edgecolor="k", fancybox=False)
+    _save(fig, out/"spectrum_local_d")
+
+
 if __name__ == "__main__":
-    run(json.loads(Path(sys.argv[1]).read_text()))
+    if sys.argv[1] == "--plot":
+        figures(sys.argv[2])
+    else:
+        run(json.loads(Path(sys.argv[1]).read_text()))

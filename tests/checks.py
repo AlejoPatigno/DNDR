@@ -95,7 +95,7 @@ def weyl_checks():
     for dim, r, tol in ((2, 60, .15), (3, 15, .3)):
         n = np.arange(-r, r+1)
         lam = np.sort(sum(g.ravel()**2 for g in np.meshgrid(*[n]*dim)))[:1001].astype(float)
-        d, _ = weyl_dimension(np.exp(-1e-3*lam), (10, 1000))
+        d = weyl_dimension(np.exp(-1e-3*lam), (10, 1000))[0]
         assert abs(d-dim) < tol, (dim, d)
         out[f"weyl_d_torus{dim}"] = float(d)
     assert np.isnan(weyl_dimension(np.exp(-1e-3*lam[:8]), (10, 1000))[0])

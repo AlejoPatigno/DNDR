@@ -1,0 +1,20 @@
+{
+  "dataset": "emnist",
+  "split": "balanced",
+  "data": "/kaggle/working/emnist_balanced.npz",
+  "n": 19200,
+  "data_seed": 7,
+  "all_train": true,
+  "alpha": 0.0,
+  "backend": "torch",
+  "device": "cpu",
+  "tile": 4096,
+  "beta_min_factor": 1.0,
+  "a_min_factor": 0.01,
+  "beta_max": 10.0,
+  "n_betas": 32,
+  "a_points": 64,
+  "trust": 1.0,
+  "smooth": 5,
+  "out": "/kaggle/working/dimension_emnist"
+}

@@ -103,6 +103,10 @@ on:
         description: "14 · E-MNIST: full dense spectrum (N = 4800/9600/19200, n/N up to 1) vs N = 112,800 Krylov (CPU session, ~2-5 h)"
         type: boolean
         default: false
+      nb_15_emnist_running_dimension_kaggle:
+        description: "15 · E-MNIST: running dimension d(E), estimators A/B/C over a beta grid up to fission (CPU session, ~2-2.5 h)"
+        type: boolean
+        default: false
 
 concurrency:
   group: kaggle-gpu
@@ -204,6 +208,7 @@ jobs:
           case "$NOTEBOOK" in
             13_emnist_kaggle) extra=', "crawford/emnist"';;
             14_emnist_full_spectrum_kaggle) extra=', "crawford/emnist"'; kernels="\"$KAGGLE_USERNAME/dndr-13-emnist-kaggle\""; gpu=false;;
+            15_emnist_running_dimension_kaggle) extra=', "crawford/emnist"'; gpu=false;;
           esac
           cat > "$dir/kernel-metadata.json" <<EOF
           {

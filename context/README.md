@@ -62,6 +62,7 @@ Todo está en [`src/`](../src/), salvo `checks.py`, que está en [`tests/`](../t
 | `geometry.py`, `volume.py`, `latent_figure.py` | Geometría exacta, alineamientos y análisis del latente |
 | `plots.py`, `export_figs.py` | CSV y figuras |
 | `spectrum.py` | Espectro λ_1…λ_k del operador DMAP para varios β (denso o Krylov sin matriz, k = 1000), dimensión de Weyl y su figura. Con `k: "all"` (denso, float64 en CPU) devuelve los N autovalores, de modo que n/N llega a 1; `--sizes` superpone varios N (y la curva de Krylov) en el eje n/N. Los modos con μ ≤ 1e-12 (piso de ruido) no se dibujan ni se ajustan |
+| `dimension.py` | Dimensión que corre d(E): para una malla logarítmica de β (espectro denso completo, `alpha = 0`, E_j = 4β(1 − λ_j)) resuelve en orden creciente hasta la fisión (hueco ≤ 1e-8, β* el último antes) y calcula tres estimadores: A (suma del kernel, d = −2 dlog S/dlog β), B (traza del calor) y C (conteo de Weyl), B y C solo con E ≤ β. Figuras `dimension_n` (d frente a n = N(E)) y `dimension_E` |
 | `checks.py` | Controles numéricos de implementación (kernel vs. referencia densa, ortogonalidad L²(π), Nyström…) |
 | `vendor/flash_diffusion.cu` | Copia sin cambios del kernel de [FlashDiffusion](https://github.com/sparsetrace/FlashDiffusion) (MIT), verificada por SHA-256 contra `SOURCE.json` |
 
@@ -97,6 +98,7 @@ Todo está en [`src/`](../src/), salvo `checks.py`, que está en [`tests/`](../t
 | `12_swiss_volumen_kaggle` | Experimento | Swiss roll con volumen (dimensión intrínseca 3) | ~3.5 h |
 | `13_emnist_kaggle` | Experimento | E-MNIST `balanced`: espectro de autovalores para 8 valores de β (k = 1000, todo el entrenamiento, Krylov) con dimensión de Weyl, y experimento piloto como 03 (requiere el Dataset `crawford/emnist`) | por medir |
 | `14_emnist_full_spectrum_kaggle` | Experimento | E-MNIST `balanced`: espectro denso completo (todos los autovalores, float64 en CPU) para N = 4800, 9600 y 19 200, superpuesto en n/N con la curva de Krylov de N = 112 800 de 13 (requiere `crawford/emnist` y, para esa curva, la salida de 13) | por medir |
+| `15_emnist_running_dimension_kaggle` | Experimento | E-MNIST `balanced`: dimensión que corre d(E) con los estimadores A/B/C sobre una malla de β hasta la fisión (N = 19 200, denso float64 en CPU; requiere `crawford/emnist`) | ~2–2,5 h (estimado) |
 
 Varios notebooks reutilizan resultados de otros desde `/kaggle/working` (p. ej. `beta_selection.json`
 de 01a). En casi todos es **opcional**: si no está, recalculan o usan β por defecto. Las excepciones

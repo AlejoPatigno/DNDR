@@ -11,6 +11,7 @@ from geometry import (swiss_embed, oracle_exact_swiss, chart_alignment, graph_sh
                       degeneracy_defect, select_beta_argmin, knn_label_accuracy, local_distortion)
 from spectral import SpectralMap, choose_beta, backend_check, dmap_spectrum, krylov_spectrum
 from spectrum import weyl_dimension
+from dimension import estimator_b, estimator_c, kernel_sums, log_slope, solve
 from vae import (fit_model, predict, predict_mc, posterior_stats, expand_state, build, VAE)
 
 
@@ -118,6 +119,33 @@ def weyl_checks():
         assert abs(d-dim) < tol, (dim, d)
         out[f"weyl_d_torus{dim}"] = float(d)
     assert np.isnan(weyl_dimension(np.exp(-1e-3*lam[:8]), (10, 1000))[0])
+    return out
+
+
+def dimension_checks():
+    """Running dimension: C (Weyl counting) and B (heat trace) on analytic flat-torus energies, A (kernel sum)
+    on a uniform square, and the fission stop of the beta scan."""
+    out = {}
+    for dim, r, tol in ((2, 60, .3), (3, 20, .3)):
+        n = np.arange(-r, r+1)
+        e = np.sort(sum(g.ravel()**2 for g in np.meshgrid(*[n]*dim)))[1:3001].astype(float)   # drop E = 0
+        lo, hi, hi_b = np.percentile(e, [5, 60, 20])
+        ec, dc, _ = estimator_c(e)
+        d_c = float(np.median(dc[(ec > lo) & (ec < hi)]))
+        eb, db = estimator_b(e, 1/(4*e[0]*.01))                  # tau from .01 up: B needs tau*E_max >> 1
+        d_b = float(np.median(db[(eb > lo) & (eb < hi_b)]))
+        assert abs(d_c-dim) < tol and abs(d_b-dim) < tol, (dim, d_c, d_b)
+        out[f"dimension_c_torus{dim}"], out[f"dimension_b_torus{dim}"] = d_c, d_b
+    x = np.random.default_rng(5).random((2000, 2))
+    b = np.geomspace(30, 3000, 25)
+    h = 2
+    d_a = float(np.median(-2*log_slope(b, kernel_sums(x, b))[h:-h]))
+    assert abs(d_a-2) < .3, d_a
+    out["dimension_a_square"] = d_a
+    u = np.random.default_rng(9).normal(size=(200, 5))
+    scan = list(solve(u, np.geomspace(1e-2, 1e6, 20)))
+    assert len(scan) < 20 and scan[-1][2] <= 1e-8 < scan[-2][2], [g for _, _, g in scan]
+    out["dimension_fission_beta_star"] = float(scan[-2][0])
     return out
 
 
@@ -271,6 +299,7 @@ def check(backend="torch", device="cpu"):
     result.update(full_spectrum_checks(backend, device))
     result.update(krylov_checks(backend, device))
     result.update(weyl_checks())
+    result.update(dimension_checks())
     result.update(emnist_checks())
     result.update(continuation_checks(device))
     result.update(oracle_head_checks(device))

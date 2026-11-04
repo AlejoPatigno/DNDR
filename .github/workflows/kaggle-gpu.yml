@@ -1,4 +1,4 @@
-# Runs the dmap_vae_kaggle notebooks on Kaggle with GPU T4 x2.
+# Runs the dmap_vae_kaggle notebooks on Kaggle with GPU T4 x2 (CPU-only notebooks: no accelerator).
 #
 # 1. Flattens src/, tests/ and experiments/configs/ with build_kaggle_package.py and
 #    uploads the result as a new version of the Kaggle Dataset the notebooks look for
@@ -99,6 +99,10 @@ on:
         description: "13 · E-MNIST: eigenvalue spectra for several beta (d=1000) + pilot experiment"
         type: boolean
         default: false
+      nb_14_emnist_full_spectrum_kaggle:
+        description: "14 · E-MNIST: full dense spectrum (N = 4800/9600/19200, n/N up to 1) vs N = 112,800 Krylov (CPU session, ~2-5 h)"
+        type: boolean
+        default: false
 
 concurrency:
   group: kaggle-gpu
@@ -193,8 +197,13 @@ jobs:
           cp tests/"$NOTEBOOK.ipynb" "$dir/" 2>/dev/null || cp experiments/"$NOTEBOOK.ipynb" "$dir/"
           # Public Kaggle datasets a notebook reads besides the code package.
           extra=""
+          # Kernel outputs a notebook reads: 14 overlays the N = 112,800 Krylov run saved by 13.
+          kernels=""
+          # CPU-only notebooks run without an accelerator so they spend no GPU quota.
+          gpu=true
           case "$NOTEBOOK" in
             13_emnist_kaggle) extra=', "crawford/emnist"';;
+            14_emnist_full_spectrum_kaggle) extra=', "crawford/emnist"'; kernels="\"$KAGGLE_USERNAME/dndr-13-emnist-kaggle\""; gpu=false;;
           esac
           cat > "$dir/kernel-metadata.json" <<EOF
           {
@@ -204,10 +213,11 @@ jobs:
             "language": "python",
             "kernel_type": "notebook",
             "is_private": true,
-            "enable_gpu": true,
-            "machine_shape": "NvidiaTeslaT4",
+            "enable_gpu": $gpu,
+            $( $gpu && echo '"machine_shape": "NvidiaTeslaT4",' )
             "enable_internet": true,
-            "dataset_sources": ["$KAGGLE_USERNAME/dndr-dmap-vae-kaggle"$extra]
+            "dataset_sources": ["$KAGGLE_USERNAME/dndr-dmap-vae-kaggle"$extra],
+            "kernel_sources": [$kernels]
           }
           EOF
           kaggle kernels push -p "$dir" | tee push.log

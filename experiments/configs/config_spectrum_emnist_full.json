@@ -1,0 +1,29 @@
+{
+  "dataset": "emnist",
+  "split": "balanced",
+  "data": "/kaggle/working/emnist_balanced.npz",
+  "n": 4800,
+  "data_seed": 7,
+  "all_train": true,
+  "method": "dense",
+  "k": "all",
+  "device": "cpu",
+  "tol": 0.0001,
+  "weyl_window": [
+    10,
+    300
+  ],
+  "factors": [
+    0.1,
+    0.25,
+    0.5,
+    1,
+    2,
+    4,
+    8,
+    16
+  ],
+  "alpha": 1.0,
+  "backend": "torch",
+  "out": "/kaggle/working/spectrum_emnist_full/N4800"
+}

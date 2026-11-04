@@ -183,19 +183,70 @@ class SpectralMap:
 def dmap_spectrum(x, d, beta, alpha=1., backend="torch", device="cpu", tile=512):
     """Leading d+1 eigenvalues (Perron value 1 first, descending) of the operator SpectralMap.fit
     solves: S = D^-1/2 K_alpha D^-1/2 on centred x, diagonal retained, same Gaussian backend.
-    Built densely and solved with LAPACK, so any d < N is exact; ARPACK at d ~ 1000 is slow and may
-    not converge.  Memory: a few N x N float64 matrices, so keep N <= ~10^4."""
+    Built densely and solved with LAPACK, so any d < N is exact (d = N-1: the whole spectrum); ARPACK
+    at d ~ 1000 is slow and may not converge.  Memory: one N x N float64 matrix (8 N^2 bytes, plus a
+    transient copy while symmetrizing), everything else in place; flash builds K as K @ I, so it is O(N^3)."""
     from scipy.linalg import eigvalsh
     x = np.asarray(x, dtype=np.float64)
     n = len(x)
     if not 0 < d < n:
         raise ValueError("Need 0 < d < N.")
     kernel = Gaussian(x - x.mean(0), float(beta), backend, device, tile)
-    k = kernel.apply(np.eye(n))
-    k = (k + k.T) / 2                       # fp16/fp32 kernel tiles are symmetric only to rounding
+    if backend == "torch":                  # the same tiles as Gaussian.apply, written straight into K (no K @ I: O(N^3))
+        xt, k = kernel.x, np.empty((n, n))
+        for i in range(0, n, tile):
+            for j in range(0, n, tile):
+                d2 = (xt[i:i+tile].square().sum(1)[:, None] + xt[j:j+tile].square().sum(1)[None, :]
+                      - 2 * xt[i:i+tile] @ xt[j:j+tile].T).clamp_min_(0)
+                k[i:i+tile, j:j+tile] = torch.exp(-kernel.beta*d2).cpu().numpy()
+    else:
+        k = kernel.apply(np.eye(n))
+    k += k.T                                # fp16/fp32 kernel tiles are symmetric only to rounding
+    k *= .5
     w = k.sum(1)**(-alpha)
     scale = w / np.sqrt(w * (k @ w))
-    return eigvalsh(scale[:, None] * k * scale[None, :], subset_by_index=[n-d-1, n-1])[::-1]
+    k *= scale[:, None]
+    k *= scale[None, :]
+    full = d == n-1
+    # k is symmetric, so its transpose (Fortran order) is what LAPACK can overwrite without a copy.
+    return eigvalsh(k.T, subset_by_index=None if full else [n-d-1, n-1], driver="evd" if full else None,
+                    overwrite_a=True, check_finite=False)[::-1]
+
+
+def krylov_spectrum(x, k, beta, alpha=1., backend="torch", device="cpu", block=None, steps=6, tile=4096, seed=7):
+    """Leading k+1 eigenvalues (Perron first, descending) and Ritz residuals of the SAME operator as
+    dmap_spectrum, without ever forming N x N: randomized block Krylov (block Lanczos, full
+    reorthogonalization) plus Rayleigh-Ritz.  Memory: two N x block*steps float64 bases.  Cost: torch
+    does one tiled kernel pass per block (`steps` passes); flash only exposes single-vector products,
+    so it costs one upstream WMMA pass per Krylov vector (m = block*steps passes), as in SpectralMap."""
+    x = np.asarray(x, dtype=np.float64)
+    n = len(x)
+    block = block or k + 1 + max(10, (k+1)//10)
+    m = block*steps
+    if not 0 < k or m >= n:
+        raise ValueError("Need 0 < k and block*steps < N.")
+    kernel = Gaussian(x - x.mean(0), float(beta), backend, device, tile)
+    w = kernel.apply(np.ones(n)).ravel()**(-alpha)
+    scale = w / np.sqrt(w * kernel.apply(w).ravel())
+    if backend == "flash":
+        op = lambda v: np.column_stack([kernel.symmetric(c, scale) for c in v.T])
+    else:
+        op = lambda v: scale[:, None] * kernel.apply(scale[:, None] * v)
+    v, sv = np.empty((n, m)), np.empty((n, m))
+    v[:, :block] = np.linalg.qr(np.random.default_rng(seed).normal(size=(n, block)))[0]
+    for j in range(steps):
+        cols = slice(j*block, (j+1)*block)
+        sv[:, cols] = op(v[:, cols])
+        if j == steps-1:
+            break
+        w_ = sv[:, cols].copy()
+        for _ in range(2):                  # classical block Gram-Schmidt, twice
+            w_ -= v[:, :cols.stop] @ (v[:, :cols.stop].T @ w_)
+        v[:, cols.stop:cols.stop+block] = np.linalg.qr(w_)[0]
+    h = v.T @ sv
+    theta, u = np.linalg.eigh((h + h.T) / 2)
+    theta, u = theta[::-1][:k+1], u[:, ::-1][:, :k+1]
+    return theta, np.linalg.norm(sv @ u - (v @ u)*theta, axis=0)
 
 
 def backend_check(backend="torch", device="cpu"):

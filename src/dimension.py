@@ -80,10 +80,14 @@ def solve(u, betas, tile=4096, tol=1e-8):
 
 
 def trusted(E, beta, cfg):
-    """B and C as (E, d) and (E, d, n) restricted to E <= trust*beta (arrays may be empty)."""
+    """B and C as (E, d) and (E, d, n) restricted to E <= trust*beta and n >= n_min (arrays may be empty).
+    A beta with no level in its trusted range gives nothing: B there only sees the tail of the clustered levels."""
     smooth, cut = cfg.get("smooth", 5), cfg.get("trust", 1.)*beta
     (eb, db), (ec, dc, nc) = estimator_b(E, beta, smooth), estimator_c(E, smooth)
-    kb, kc = eb <= cut, ec <= cut
+    if not np.any((E > 0) & (E <= cut)):
+        eb, ec = eb[:0], ec[:0]
+        db, dc, nc = db[:0], dc[:0], nc[:0]
+    kb, kc = eb <= cut, (ec <= cut) & (nc >= cfg.get("n_min", 1))
     return (eb[kb], db[kb]), (ec[kc], dc[kc], nc[kc])
 
 
@@ -147,10 +151,11 @@ def figures(out, cfg=None):
         nb = np.searchsorted(e_pos, eb, side="right")
         if len(ec):
             ax.plot(nc, dc, color=c, lw=1, label=f"{b:.2g}")
-            ax2.plot(ec, dc, color="tab:green", lw=.5, alpha=.7, label="C" if b == betas[0] else None)
+            ax2.plot(ec, dc, color="tab:green", lw=.5, alpha=.7, label="C" if "C" not in ax2.get_legend_handles_labels()[1] else None)
         if len(eb):
-            ax.plot(nb[nb > 0], db[nb > 0], color=c, lw=.6, ls="--")
-            ax2.plot(eb, db, color="tab:orange", lw=.5, alpha=.7, label="B" if b == betas[0] else None)
+            kb = nb >= max(cfg.get("n_min", 1), 1)
+            ax.plot(nb[kb], db[kb], color=c, lw=.6, ls="--")
+            ax2.plot(eb, db, color="tab:orange", lw=.5, alpha=.7, label="B" if "B" not in ax2.get_legend_handles_labels()[1] else None)
     ab = a["a_betas"]
     ok = a["a_sums"] > 0
     ea, da = _trim(4*ab[ok], smooth), _trim(-2*log_slope(ab[ok], a["a_sums"][ok], smooth), smooth)

@@ -98,7 +98,7 @@ Todo está en [`src/`](../src/), salvo `checks.py`, que está en [`tests/`](../t
 | `12_swiss_volumen_kaggle` | Experimento | Swiss roll con volumen (dimensión intrínseca 3) | ~3.5 h |
 | `13_emnist_kaggle` | Experimento | E-MNIST `balanced`: espectro de autovalores para 8 valores de β (k = 1000, todo el entrenamiento, Krylov) con dimensión de Weyl, y experimento piloto como 03 (requiere el Dataset `crawford/emnist`) | por medir |
 | `14_emnist_full_spectrum_kaggle` | Experimento | E-MNIST `balanced`: espectro denso completo (todos los autovalores, float64 en CPU) para N = 4800, 9600 y 19 200, superpuesto en n/N con la curva de Krylov de N = 112 800 de 13 (requiere `crawford/emnist` y, para esa curva, la salida de 13) | por medir |
-| `15_emnist_running_dimension_kaggle` | Experimento | E-MNIST `balanced`: dimensión que corre d(E) con los estimadores A/B/C sobre una malla de β hasta la fisión (N = 19 200, denso float64 en CPU; requiere `crawford/emnist`) | ~2–2,5 h (estimado) |
+| `15_emnist_running_dimension_kaggle` | Experimento | E-MNIST `balanced`: dimensión que corre d(E) con los estimadores A/B/C sobre una malla densa de β en [0,0045; 0,016] hasta la fisión (N = 19 200, denso float64 en CPU; requiere `crawford/emnist`) | ~2,2 h |
 
 Varios notebooks reutilizan resultados de otros desde `/kaggle/working` (p. ej. `beta_selection.json`
 de 01a). En casi todos es **opcional**: si no está, recalculan o usan β por defecto. Las excepciones

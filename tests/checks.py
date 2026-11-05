@@ -11,7 +11,7 @@ from geometry import (swiss_embed, oracle_exact_swiss, chart_alignment, graph_sh
                       degeneracy_defect, select_beta_argmin, knn_label_accuracy, local_distortion)
 from spectral import SpectralMap, choose_beta, backend_check, dmap_spectrum, krylov_spectrum
 from spectrum import weyl_dimension
-from dimension import estimator_b, estimator_c, kernel_sums, log_slope, solve
+from dimension import estimator_b, estimator_c, kernel_sums, log_slope, solve, trusted
 from vae import (fit_model, predict, predict_mc, posterior_stats, expand_state, build, VAE)
 
 
@@ -146,6 +146,13 @@ def dimension_checks():
     scan = list(solve(u, np.geomspace(1e-2, 1e6, 20)))
     assert len(scan) < 20 and scan[-1][2] <= 1e-8 < scan[-2][2], [g for _, _, g in scan]
     out["dimension_fission_beta_star"] = float(scan[-2][0])
+    # A beta with no level in its trusted range contributes nothing (B would only see the clustered tail),
+    # and C drops the noisy first n_min levels.
+    (eb, _), (ec, _, _) = trusted(np.r_[0., np.linspace(3, 5, 500)], 1., {})
+    assert len(eb) == 0 and len(ec) == 0, (len(eb), len(ec))
+    nc = trusted(np.r_[0., e], 10*e.max(), {"n_min": 20})[1][2]
+    assert len(nc) and nc.min() >= 20, nc[:5]
+    out["dimension_untrusted_beta_empty"] = "passed"
     return out
 
 
